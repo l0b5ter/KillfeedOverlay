@@ -1,6 +1,6 @@
 # KillfeedOverlay
 Simple overlay for PS2, that displays the last one who killed you (last bullet HS or not). And top 3 who killed you the most.
-Overlay written in .cpp with no additional libs, meaning that the .exe can be run without anything extra.
+Overlay written in .cpp with no additional libs, meaning that the .exe can be run without anything extra. Made on request by a PS2 player.
 
 ## Features
 * Shows name of the last who killed you.
