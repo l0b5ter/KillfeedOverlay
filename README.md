@@ -10,6 +10,7 @@ Overlay written in .cpp with no additional libs, meaning that the .exe can be ru
 * Lots of config options.
 
 To change stuff, simply change the config.json
+```
 {
   "service_id": "s:sealobster",		// api key to use toward the census.daybreakgames.com
   "character_name": "Sealobster", // Name of player to track
@@ -29,3 +30,4 @@ To change stuff, simply change the config.json
   "skip_environment": false, // Used when stream returns null, setting this to true makes it dont check for any errors
   "poll_ms": 1000  // How often it sud fetch data from the api
 }
+```
