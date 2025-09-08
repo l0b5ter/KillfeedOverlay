@@ -22,6 +22,9 @@ To change stuff, simply change the config.json
   "chroma_r": 255, 		  // Transparent filter, used to filter out the background
   "chroma_g": 0,		  // Transparent filter, used to filter out the background
   "chroma_b": 255,		  // Transparent filter, used to filter out the background
+  "text_r": 0,      // Color of the text, text_r = 0, text_g = 0, text_b = 0 gives black text
+  "text_g": 0,
+  "text_b": 0,
   
   "max_rows": 8,		  // Max rows in the window
   "min_deaths_to_list": 1,// Minimum required deaths by player to display it
