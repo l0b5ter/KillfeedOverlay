@@ -3,6 +3,9 @@ Simple overlay for PS2, that displays the last one who killed you (last bullet H
 Overlay written in .cpp with no additional libs, meaning that the .exe can be run without anything extra. Made on request by a PS2 player.
 
 Run "g++ -std=gnu++17 -O2 -Wall -Wextra main.cpp -lgdi32 -luser32 -lwininet -mwindows -o KillfeedOverlay.exe" in cmd to compile it into a .exe
+Or
+Run "g++ -std=gnu++17 -O2 -Wall -Wextra main.cpp -static-libgcc -static-libstdc++ -lgdi32 -luser32 -lwininet -mwindows -o KillfeedOverlay.exe" in cmd to compile it into a .exe
+This one doesnt require any lib, but tradeoff is alittle unstability.
 
 ## Features
 * Shows name of the last who killed you.
