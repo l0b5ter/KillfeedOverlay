@@ -1,5 +1,5 @@
 // main.cpp — PS2 deaths overlay (Hybrid PEAK + Batch, pagination + robust dedupe)
-// True transparent background via per-pixel alpha (no magenta fringe).
+// True transparent background via per-pixel alpha (no fringes) + configurable text color.
 //
 // Build:
 //   g++ -std=gnu++17 -O2 -Wall -Wextra main.cpp -lgdi32 -luser32 -lwininet -mwindows -o Killfeed.exe
@@ -31,14 +31,19 @@ struct AppCfg {
     bool always_on_top    = true;
     bool skip_environment = true;
 
-    // If true, render with per-pixel alpha (recommended; no fringe).
-    // If false, we keep legacy opaque window with uniform alpha.
+    // If true: per-pixel alpha (recommended; no fringe).
+    // If false: legacy window with uniform alpha.
     bool transparent_bg   = false;
 
-    // Legacy chroma settings (ignored when transparent_bg=true)
+    // Legacy chroma (ignored when transparent_bg=true)
     int  chroma_r         = 255;
     int  chroma_g         = 0;
     int  chroma_b         = 255;
+
+    // Configurable text color
+    int  text_r           = 0;
+    int  text_g           = 0;
+    int  text_b           = 0;
 } g_cfg;
 
 static const wchar_t* g_apiHost = L"census.daybreakgames.com";
@@ -74,7 +79,8 @@ static HMENU g_ctxMenu = nullptr;
 #define IDM_EXIT  1001
 
 // For legacy chroma path (ignored when transparent_bg=true)
-static COLORREF g_chroma = RGB(255,0,255);
+static COLORREF g_chroma    = RGB(255,0,255);
+static COLORREF g_textColor = RGB(0,0,0);
 
 // =========================== Utilities ======================
 template<typename T>
@@ -388,7 +394,7 @@ static HBITMAP CreateDIB32(HDC ref, int w, int h, void** outBits){
     return hbmp;
 }
 
-// Draws text as WHITE onto black, then converts white intensity -> alpha, RGB -> black.
+// Draws text as WHITE onto black, then converts white intensity -> alpha and tints to config color.
 // Finally pushes to the layered window with UpdateLayeredWindow.
 static void RepaintLayered(){
     if (!g_hwnd) return;
@@ -414,7 +420,7 @@ static void RepaintLayered(){
     SetBkMode(memDC, TRANSPARENT);
     SetTextColor(memDC, RGB(255,255,255)); // draw in white
 
-    // Layout (same as before)
+    // Layout
     TEXTMETRICW tm{}; GetTextMetricsW(memDC,&tm);
     int lineH = tm.tmHeight + 6;
     int y = 6, left = 8;
@@ -455,14 +461,19 @@ static void RepaintLayered(){
         y += lineH; ++shown;
     }
 
-    // Convert white->alpha and force RGB=black (premultiplied)
-    // Pixel format is BGRA in memory on little-endian Windows (BI_RGB 32).
+    // Convert white->alpha; set RGB to configured color (premultiplied)
     unsigned char* p = (unsigned char*)bits;
-    for (int i=0;i<W*H;i++){
+    const unsigned cR = (unsigned)g_cfg.text_r;
+    const unsigned cG = (unsigned)g_cfg.text_g;
+    const unsigned cB = (unsigned)g_cfg.text_b;
+
+    for (int i=0;i<W*H;++i){
         unsigned char B = p[0], G = p[1], R = p[2];
         unsigned char A = (R>G?R:G); if (B>A) A = B; // A = max(R,G,B)
-        p[0] = 0; p[1] = 0; p[2] = 0; // black text
-        p[3] = A;                     // alpha from intensity
+        p[2] = (unsigned char)((cR * A + 127) / 255); // R premultiplied
+        p[1] = (unsigned char)((cG * A + 127) / 255); // G
+        p[0] = (unsigned char)((cB * A + 127) / 255); // B
+        p[3] = A;                                     // A
         p += 4;
     }
 
@@ -472,11 +483,9 @@ static void RepaintLayered(){
     POINT ptSrc{0,0};
     BLENDFUNCTION bf{AC_SRC_OVER, 0, 255, AC_SRC_ALPHA};
 
-    // Ensure layered style
     LONG ex = GetWindowLongW(g_hwnd, GWL_EXSTYLE);
     if(!(ex & WS_EX_LAYERED)) SetWindowLongW(g_hwnd, GWL_EXSTYLE, ex | WS_EX_LAYERED);
 
-    // Map window position
     RECT wr; GetWindowRect(g_hwnd, &wr);
     POINT wndPos{wr.left, wr.top};
 
@@ -500,7 +509,7 @@ static void PaintLegacyOpaque(HDC hdc, RECT rc){
     HFONT hFont = (HFONT)GetStockObject(DEFAULT_GUI_FONT);
     HFONT hOld  = (HFONT)SelectObject(hdc, hFont);
     SetBkMode(hdc, TRANSPARENT);
-    SetTextColor(hdc, RGB(0,0,0)); // black
+    SetTextColor(hdc, g_textColor); // use configured color
 
     TEXTMETRICW tm{}; GetTextMetricsW(hdc,&tm);
     int lineH = tm.tmHeight + 6;
@@ -581,6 +590,12 @@ static bool LoadConfigFromFile(){
     if(JsonFindInt(j, "chroma_g", v))            g_cfg.chroma_g = Clamp255(v);
     if(JsonFindInt(j, "chroma_b", v))            g_cfg.chroma_b = Clamp255(v);
     g_chroma = RGB(g_cfg.chroma_r, g_cfg.chroma_g, g_cfg.chroma_b);
+
+    // NEW: text color
+    if(JsonFindInt(j, "text_r", v)) g_cfg.text_r = Clamp255(v);
+    if(JsonFindInt(j, "text_g", v)) g_cfg.text_g = Clamp255(v);
+    if(JsonFindInt(j, "text_b", v)) g_cfg.text_b = Clamp255(v);
+    g_textColor = RGB(g_cfg.text_r, g_cfg.text_g, g_cfg.text_b);
 
     // window
     size_t p = j.find("\"window\"");
@@ -754,7 +769,7 @@ static void PollOnce(){
         g_status = L"Updated (batch)";
         if(g_hwnd){ if (g_cfg.transparent_bg) RepaintLayered(); else InvalidateRect(g_hwnd,nullptr,TRUE); }
     }
-    SetTopMostIfNeeded();
+    ReassertTopMost();
 }
 
 // ========================== Window plumbing ===================
@@ -781,7 +796,7 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPara
         case WM_ACTIVATE:
         case WM_ACTIVATEAPP:
         case WM_NCACTIVATE:
-            SetTopMostIfNeeded();
+            ReassertTopMost();
             return 0;
 
         case WM_NCHITTEST:
@@ -815,7 +830,7 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPara
         case WM_TIMER:
             if(wParam==TIMER_ID){
                 PollOnce();
-                SetTopMostIfNeeded();
+                ReassertTopMost();
             }
             return 0;
 
@@ -829,7 +844,6 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPara
                 PaintLegacyOpaque(hdc, rc);
                 EndPaint(hwnd,&ps);
             } else {
-                // In true transparent mode, paint is a no-op; we redraw via UpdateLayeredWindow
                 PAINTSTRUCT ps; BeginPaint(hwnd,&ps); EndPaint(hwnd,&ps);
                 RepaintLayered();
             }
@@ -887,7 +901,7 @@ int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int nCmdShow){
         if(!body.empty() && ParseCharacterId(body, cid)) g_characterId = cid;
     }
 
-    SetTopMostIfNeeded();
+    ReassertTopMost();
     SetForegroundWindow(g_hwnd);
     SetFocus(g_hwnd);
 
