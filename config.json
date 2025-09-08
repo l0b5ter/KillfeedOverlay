@@ -1,12 +1,15 @@
 {
   "service_id": "s:sealobster",		// api key to use toward the census.daybreakgames.com
-  "character_name": "MamaloveZgeg", // Name of player to track
+  "character_name": "Chinabot911", // Name of player to track
 
   "window": { "x": 400, "y": 10, "w": 360, "h": 260, "alpha": 255 }, // Window position and size
   "transparent_bg": true, // To use transparent background
   "chroma_r": 255, 		  // Transparent filter, used to filter out the background
   "chroma_g": 0,		  // Transparent filter, used to filter out the background
   "chroma_b": 255,		  // Transparent filter, used to filter out the background
+  "text_r": 0,      // Color of the text, text_r = 0, text_g = 0, text_b = 0 gives black text
+  "text_g": 0,
+  "text_b": 0,
   
   "max_rows": 8,		  // Max rows in the window
   "min_deaths_to_list": 1,// Minimum required deaths by player to display it
@@ -16,4 +19,5 @@
   "always_on_top": true,  // Make the window always on top
   "skip_environment": false, // Used when stream returns null, setting this to true makes it dont check for any errors
   "poll_ms": 1000  // How often it sud fetch data from the api
+
 }
